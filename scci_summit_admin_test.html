@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TEST COPY — Summit 2026 Admin Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+:root { --bg:#050505; --surface:#0e0e10; --surface-2:#16161a; --text:#fff; --text-soft:#b8b8b8; --text-dim:#7a7a7f;
+  --blue:#3b82f6; --violet:#7c3aed; --red:#c81e2b; --green:#22c55e; --amber:#f59e0b; --border:rgba(255,255,255,.1); }
+* { box-sizing:border-box; }
+body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; }
+h1,h2 { font-family:'Space Grotesk',sans-serif; margin:0; }
+.wrap { max-width: 1180px; margin:0 auto; padding: 26px 20px 80px; }
+.glass { background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015)); border:1px solid var(--border); border-radius:16px; padding:20px; backdrop-filter: blur(16px); }
+#login { max-width:380px; margin:100px auto; }
+input, select { padding:10px 12px; background:var(--surface); border:1px solid var(--border); border-radius:10px; color:var(--text); font-size:13px; font-family:inherit; }
+.btn { padding:10px 16px; border-radius:10px; border:none; cursor:pointer; font-size:13px; font-weight:600; background:linear-gradient(135deg,var(--blue),var(--violet)); color:#fff; }
+.btn-ghost { background:var(--surface-2); color:var(--text); border:1px solid var(--border); }
+.btn-sm { padding:6px 10px; font-size:12px; }
+.stats { display:grid; grid-template-columns: repeat(4,1fr); gap:12px; margin-bottom:18px; }
+@media (max-width:700px){ .stats { grid-template-columns: repeat(2,1fr);} }
+.stat { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px 16px; }
+.stat .n { font-size:24px; font-weight:700; font-family:'Space Grotesk'; }
+.stat .l { font-size:12px; color:var(--text-dim); margin-top:2px; }
+.filters { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+.filters input, .filters select { min-width:140px; }
+table { width:100%; border-collapse:collapse; font-size:12.5px; }
+th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+th { color:var(--text-dim); font-size:11px; text-transform:uppercase; font-weight:600; position:sticky; top:0; background:var(--bg); }
+tbody tr:hover { background:var(--surface); }
+.table-scroll { overflow:auto; max-height:560px; border:1px solid var(--border); border-radius:12px; }
+.pill { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.pill-submitted,.pill-pending { background:rgba(245,158,11,.15); color:var(--amber); }
+.pill-approved,.pill-paid,.pill-checked_in { background:rgba(34,197,94,.15); color:var(--green); }
+.pill-rejected,.pill-failed { background:rgba(200,30,43,.15); color:#ff8a8a; }
+.pill-not_required,.pill-cancelled { background:rgba(255,255,255,.08); color:var(--text-dim); }
+.mono { font-family:'IBM Plex Mono',monospace; }
+.flag { color:var(--red); font-weight:700; margin-left:4px; cursor:help; }
+select.status-select { background:var(--surface-2); font-size:12px; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="glass">
+    <h2 style="margin-bottom:16px;">Organizer sign in</h2>
+    <label style="font-size:12px;color:var(--text-dim);">Email</label><br/>
+    <input type="email" id="loginEmail" style="width:100%; margin:6px 0 12px;" /><br/>
+    <label style="font-size:12px;color:var(--text-dim);">Password</label><br/>
+    <input type="password" id="loginPassword" style="width:100%; margin:6px 0 12px;" /><br/>
+    <button class="btn" id="loginBtn" style="width:100%;">Sign in</button>
+    <p id="loginMsg" style="font-size:12px;color:var(--text-dim); margin-top:10px;"></p>
+  </div>
+</div>
+
+<div class="wrap" id="app" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+    <div><p style="color:#93c5fd;font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 8px;">SCCI · Event Operations</p>
+    <h1 style="margin-bottom:8px;">Summit 2026 Admin — TEST COPY</h1>
+    <p id="eventMeta" style="color:var(--text-dim);font-size:13px;line-height:1.6;margin:0;">Loading event details…</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a class="btn btn-ghost btn-sm" href="checkin-test.html" style="text-decoration:none;">Open check-in</a>
+      <button class="btn btn-ghost btn-sm" id="btnLogout">Sign out</button>
+    </div>
+  </div>
+  <h2 style="font-size:18px;margin:20px 0 12px;">Registration management</h2>
+
+  <div class="stats">
+    <div class="stat"><div class="n" id="statTotal">—</div><div class="l">Total registered</div></div>
+    <div class="stat"><div class="n" id="statPaid">—</div><div class="l">Payment confirmed</div></div>
+    <div class="stat"><div class="n" id="statChecked">—</div><div class="l">Checked in</div></div>
+    <div class="stat"><div class="n" id="statFlagged">—</div><div class="l">Possible duplicates</div></div>
+  </div>
+
+  <div class="glass">
+    <div class="filters">
+      <input type="text" id="fSearch" placeholder="Search name, email, school, ref..." style="flex:1; min-width:220px;" />
+      <select id="fType"><option value="">All types</option></select>
+      <select id="fStatus"><option value="">All statuses</option><option value="submitted">Submitted</option><option value="under_review">Under review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="checked_in">Checked in</option><option value="cancelled">Cancelled</option></select>
+      <select id="fPayment"><option value="">All payment</option><option value="not_required">Not required</option><option value="pending">Pending</option><option value="paid">Paid</option><option value="failed">Failed</option></select>
+      <select id="fCheckin"><option value="">Check-in: all</option><option value="yes">Checked in</option><option value="no">Not checked in</option></select>
+      <button class="btn-ghost btn-sm" id="btnRefresh">Refresh</button>
+      <button class="btn btn-sm" id="btnExport">Export CSV</button>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Ref</th><th>Name</th><th>Type</th><th>School</th><th>Email</th>
+          <th>Status</th><th>Payment</th><th>Checked in</th><th>Submitted</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="9" style="color:var(--text-dim); padding:20px;">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://qnasjflifrdllwicrfdg.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_VixtRQE67H9okiiBWwCsNg_FEQzuPAv";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const EVENT_SLUG = "scci-connection-test-2026";
+
+let ALL_ROWS = [];
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const msg = document.getElementById('loginMsg');
+  msg.textContent = 'Signing in...';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { msg.textContent = error.message; return; }
+  boot();
+});
+sb.auth.onAuthStateChange((event, session) => { if (session) boot(); else showLogin(); });
+document.getElementById('btnLogout').addEventListener('click', async () => { await sb.auth.signOut(); showLogin('You have signed out.'); });
+// Restore an existing session after a refresh.
+sb.auth.getSession().then(({data}) => { if (data.session) boot(); });
+
+let booting = false;
+async function boot() {
+  if (booting) return;
+  booting = true;
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return showLogin('Please sign in to continue.');
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await loadData();
+  } finally { booting = false; }
+}
+function showLogin(message='') {
+  document.getElementById('login').style.display = 'block';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginMsg').textContent = message;
+}
+
+
+async function loadData() {
+  const { data: ev, error: eventError } = await sb.from('events').select('id, name, starts_at, venue, status, participant_types, payment_required').eq('slug', EVENT_SLUG).single();
+  if (eventError || !ev) { document.getElementById('eventMeta').textContent = 'Could not load event. Your account must be an SCCI admin or an assigned event organiser.'; document.getElementById('tbody').innerHTML = `<tr><td colspan="9">${escapeHtml(eventError?.message || 'Event not found.')}</td></tr>`; return; }
+  document.getElementById('eventMeta').textContent = `${ev.name} · ${ev.starts_at || 'Date TBC'} · ${ev.venue || 'Venue TBC'} · Registration ${ev.status} · ${ev.payment_required ? 'Payment required' : 'No payment required'}`;
+
+  const typeSel = document.getElementById('fType');
+  if (typeSel.options.length === 1) (ev.participant_types || []).forEach(t => { const o=document.createElement('option'); o.value=t; o.textContent=t; typeSel.appendChild(o); });
+
+  // RLS (event_registrations_organizer_read) already restricts this to rows
+  // the signed-in user organizes — no client-side permission check needed.
+  const { data, error } = await sb
+    .from('event_registrations')
+    .select('*')
+    .eq('event_id', ev.id)
+    .order('submitted_at', { ascending: false });
+
+  if (error) { document.getElementById('tbody').innerHTML = `<tr><td colspan="9">${escapeHtml(error.message)}</td></tr>`; return; }
+  ALL_ROWS = data || [];
+  flagDuplicates();
+  renderStats();
+  renderTable();
+}
+
+function flagDuplicates() {
+  const seen = {};
+  ALL_ROWS.forEach(r => {
+    const key = (r.email || '').toLowerCase() + '|' + (r.full_name || '').toLowerCase().trim();
+    seen[key] = (seen[key] || 0) + 1;
+  });
+  ALL_ROWS.forEach(r => {
+    const key = (r.email || '').toLowerCase() + '|' + (r.full_name || '').toLowerCase().trim();
+    r._dup = seen[key] > 1;
+  });
+}
+
+function renderStats() {
+  document.getElementById('statTotal').textContent = ALL_ROWS.length;
+  document.getElementById('statPaid').textContent = ALL_ROWS.filter(r => r.payment_status === 'paid').length;
+  document.getElementById('statChecked').textContent = ALL_ROWS.filter(r => r.checked_in_at).length;
+  document.getElementById('statFlagged').textContent = ALL_ROWS.filter(r => r._dup).length;
+}
+
+function applyFilters() {
+  const q = document.getElementById('fSearch').value.trim().toLowerCase();
+  const type = document.getElementById('fType').value;
+  const status = document.getElementById('fStatus').value;
+  const payment = document.getElementById('fPayment').value;
+  const checkin = document.getElementById('fCheckin').value;
+  return ALL_ROWS.filter(r => {
+    if (q && !(`${r.full_name} ${r.email} ${r.school_name} ${r.reference_code}`.toLowerCase().includes(q))) return false;
+    if (type && r.participant_type !== type) return false;
+    if (status && r.status !== status) return false;
+    if (payment && (r.payment_status || 'not_required') !== payment) return false;
+    if (checkin === 'yes' && !r.checked_in_at) return false;
+    if (checkin === 'no' && r.checked_in_at) return false;
+    return true;
+  });
+}
+
+function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function pill(val) { const safe = escapeHtml(val || 'not_required'); return `<span class="pill pill-${safe}">${safe.replaceAll('_',' ')}</span>`; }
+
+async function updateStatus(id, newStatus) {
+  const { error } = await sb.rpc('update_event_registration_status', { p_registration_id: id, p_status: newStatus, p_note: null });
+  if (error) { alert(error.message); return; }
+  await loadData();
+}
+
+function renderTable() {
+  const rows = applyFilters();
+  const tbody = document.getElementById('tbody');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-dim); padding:20px;">No matching registrations.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="mono">${escapeHtml(r.reference_code)}</td>
+      <td>${escapeHtml(r.full_name)}${r._dup ? '<span class="flag" title="Possible duplicate: same name + email appears more than once">⚠</span>' : ''}</td>
+      <td>${escapeHtml(r.participant_type)}</td>
+      <td>${escapeHtml(r.school_name || '')}</td>
+      <td>${escapeHtml(r.email)}</td>
+      <td>
+        ${r.status === 'checked_in' || r.checked_in_at
+          ? '<span class="pill pill-checked_in">checked in</span>'
+          : `<select class="status-select" onchange="updateStatus('${r.id}', this.value)">
+              ${[...(r.status==='submitted'?['submitted']:[]),'under_review','needs_information','approved','rejected','cancelled','finalist','winner'].map(s => `<option value="${s}" ${s===r.status?'selected':''} ${s==='submitted'?'disabled':''}>${s.replaceAll('_',' ')}</option>`).join('')}
+            </select>`}
+      </td>
+      <td>${pill(r.payment_status || 'not_required')}</td>
+      <td>${r.checked_in_at ? '✓ ' + new Date(r.checked_in_at).toLocaleString() : '—'}</td>
+      <td>${new Date(r.submitted_at).toLocaleDateString()}</td>
+    </tr>`).join('');
+}
+window.updateStatus = updateStatus;
+
+['fSearch','fType','fStatus','fPayment','fCheckin'].forEach(id =>
+  document.getElementById(id).addEventListener('input', renderTable));
+document.getElementById('btnRefresh').addEventListener('click', async () => {
+  const button = document.getElementById('btnRefresh');
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Refreshing…';
+  try {
+    await loadData();
+  } catch (error) {
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="9">Refresh failed: ${escapeHtml(error?.message || error)}</td></tr>`;
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+});
+
+document.getElementById('btnExport').addEventListener('click', () => {
+  const rows = applyFilters();
+  const headers = ['reference_code','full_name','email','phone','participant_type','school_name','competition_category','status','payment_status','checked_in_at','submitted_at'];
+  const csv = [headers.join(',')].concat(
+    rows.map(r => headers.map(h => `"${(r[h] ?? '').toString().replace(/"/g,'""')}"`).join(','))
+  ).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `scci-registrations-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+});
+</script>
+</body>
+</html>
